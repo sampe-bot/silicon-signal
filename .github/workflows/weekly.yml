@@ -45,7 +45,8 @@ jobs:
         if: github.event_name != 'push'
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          OPENAI_MODEL: gpt-6-luna
+          OPENAI_BASE_URL: https://openrouter.ai/api/v1
+          OPENAI_MODEL: 'nvidia/nemotron-3.5-super-vl:free'
           TARGET_WEEK: ${{ github.event.inputs.week || 'previous' }}
         run: python scripts/collect.py --week "$TARGET_WEEK"
       - name: Commit new edition to history

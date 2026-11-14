@@ -76,3 +76,7 @@ Semiconductor Engineering、Semiconductor Digest、EE Times、IEEE Spectrum、Se
 ## 技術構成
 
 Static HTML/CSS/JavaScript + Python標準ライブラリRSS収集 + GitHub Actions + GitHub Pages。無料の静的ホスティングを第一候補にして、要件が固まったらNext.js、DB、認証、API、配信機能へ拡張できます。
+
+## 開発メモ
+- Gemini APIの利用可に拡張
+- 調査範囲に特許と論文データベースを追加する
