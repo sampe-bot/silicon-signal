@@ -1,0 +1,105 @@
+{
+  "week": "2026-W46",
+  "start": "2026-11-09",
+  "end": "2026-11-15",
+  "generatedAt": "2026-11-14T21:00:00+09:00",
+  "provisional": true,
+  "overview": "初期版には公式発表を5件掲載。製造装置の決算、材料産業の再編、ファウンドリ売上、AIモデル・APIの発表が中心です。",
+  "articles": [
+    {
+      "id": "seed-amat-20261112",
+      "category": "equipment",
+      "title": "Applied Materials Announces Fourth Quarter and Fiscal Year 2026 Results",
+      "titleJa": "Applied Materials、2026年度第4四半期売上高が前年同期比53%増",
+      "summaryJa": "四半期売上高は104.1億ドル、通期売上高は344.5億ドルで、それぞれ過去最高を記録。半導体製造装置関連の需要動向を示す決算発表。",
+      "whyJa": "AI向け先端チップ投資と製造装置需要を確認する重要な指標。",
+      "source": "Applied Materials（公式）",
+      "publishedAt": "2026-11-13T06:01:00+09:00",
+      "url": "https://ir.appliedmaterials.com/news-releases/news-release-details/applied-materials-announces-fourth-quarter-and-fiscal-year-2026",
+      "score": 99,
+      "tags": [
+        "Applied Materials",
+        "WFE",
+        "決算",
+        "製造装置"
+      ],
+      "enriched": false
+    },
+    {
+      "id": "seed-jsr-20261109",
+      "category": "materials",
+      "title": "株主の異動に関するお知らせ",
+      "titleJa": "三井化学と日本政策投資銀行、JSRの株式取得を予定",
+      "summaryJa": "JSRは11月9日、JIC系ファンドが保有する全株式を三井化学と日本政策投資銀行が取得する予定と発表。実行後は三井化学の連結子会社になる見込み。",
+      "whyJa": "日本のフォトレジストを含む半導体材料産業の再編に関わる。",
+      "source": "JSR（公式）",
+      "publishedAt": "2026-11-09",
+      "url": "https://www.jsr.co.jp/news/2026/20261109.html",
+      "score": 98,
+      "tags": [
+        "JSR",
+        "三井化学",
+        "フォトレジスト",
+        "材料"
+      ],
+      "enriched": false
+    },
+    {
+      "id": "seed-tsmc-20261110",
+      "category": "semiconductor",
+      "title": "TSMC October 2026 Revenue Report",
+      "titleJa": "TSMC、2026年10月の売上高が前年同月比59.7%増",
+      "summaryJa": "TSMCの10月売上高は5,868.9億台湾ドル。前月比14.7%増、前年同月比59.7%増と発表された。",
+      "whyJa": "最先端ロジック半導体の需要を把握するための主要な月次データ。",
+      "source": "TSMC（公式）",
+      "publishedAt": "2026-11-10",
+      "url": "https://pr.tsmc.com/japanese/news/3349",
+      "score": 96,
+      "tags": [
+        "TSMC",
+        "ファウンドリ",
+        "ロジック",
+        "売上"
+      ],
+      "enriched": false
+    },
+    {
+      "id": "seed-gemini-20261112",
+      "category": "ai",
+      "title": "Gemini 4 Hydrogen Model Card",
+      "titleJa": "Google DeepMind、エージェント向けGemini 4 Hydrogenを公開",
+      "summaryJa": "日常的なコーディングやAIエージェント業務における速度と効率を重視したGemini 4 Hydrogenのモデルカードが公開された。",
+      "whyJa": "AIエージェントの実装でモデル選択肢が広がる。",
+      "source": "Google DeepMind（公式）",
+      "publishedAt": "2026-11-12",
+      "url": "https://deepmind.google/models/model-cards/gemini-4-hydrogen/",
+      "score": 94,
+      "tags": [
+        "Google",
+        "Gemini",
+        "LLM",
+        "Agent"
+      ],
+      "enriched": false
+    },
+    {
+      "id": "seed-decisions-20261111",
+      "category": "ai",
+      "title": "Gemini Decisions API: Fast, calibrated multimodal decisions",
+      "titleJa": "Google、分類・ルーティング向け「Gemini Decisions API」を発表",
+      "summaryJa": "新モデルGemini Decision 1によって、テキスト・画像などの入力に対し最大1,000件の選択式質問を一度に評価できるAPIを発表。",
+      "whyJa": "LLMによる文章生成を使わず、ツール選択や判定処理を高速化する可能性がある。",
+      "source": "Google（公式）",
+      "publishedAt": "2026-11-11",
+      "url": "https://blog.google/innovation-and-ai/technology/developers-tools/gemini-decisions-api/",
+      "score": 91,
+      "tags": [
+        "Google",
+        "API",
+        "model routing",
+        "AIエージェント"
+      ],
+      "enriched": false
+    }
+  ]
+}

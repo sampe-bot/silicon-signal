@@ -1,0 +1,16 @@
+[
+  {"name":"Semiconductor Engineering","url":"https://semiengineering.com/feed/","category":"auto","priority":4},
+  {"name":"Semiconductor Digest","url":"https://www.semiconductor-digest.com/feed/","category":"auto","priority":4},
+  {"name":"EE Times","url":"https://www.eetimes.com/feed/","category":"auto","priority":3},
+  {"name":"IEEE Spectrum / Semiconductors","url":"https://spectrum.ieee.org/feeds/topic/semiconductors.rss","category":"semiconductor","priority":4},
+  {"name":"SemiAnalysis","url":"https://newsletter.semianalysis.com/feed","category":"auto","priority":4},
+  {"name":"Samsung Semiconductor","url":"https://news.samsung.com/global/category/products/semiconductors/feed","category":"semiconductor","priority":5},
+  {"name":"NVIDIA Newsroom","url":"https://nvidianews.nvidia.com/releases.xml","category":"auto","priority":5},
+  {"name":"OpenAI","url":"https://openai.com/news/rss.xml","category":"ai","priority":5},
+  {"name":"Google DeepMind","url":"https://deepmind.google/blog/rss.xml","category":"ai","priority":5},
+  {"name":"Google Research","url":"https://research.google/blog/rss/","category":"ai","priority":4},
+  {"name":"Hugging Face","url":"https://huggingface.co/blog/feed.xml","category":"ai","priority":4},
+  {"name":"Google AI","url":"https://blog.google/innovation-and-ai/technology/ai/rss/","category":"ai","priority":5},
+  {"name":"半導体材料ニュース検索","url":"https://news.google.com/rss/search?q=semiconductor%20photoresist%20OR%20silicon%20wafer%20OR%20CMP%20slurry%20when%3A7d&hl=en-US&gl=US&ceid=US%3Aen","category":"materials","priority":2},
+  {"name":"半導体装置ニュース検索","url":"https://news.google.com/rss/search?q=semiconductor%20etch%20equipment%20OR%20lithography%20OR%20deposition%20equipment%20when%3A7d&hl=en-US&gl=US&ceid=US%3Aen","category":"equipment","priority":2}
+]
