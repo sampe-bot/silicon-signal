@@ -226,8 +226,8 @@ def enrich_with_openai(rows: list[dict]) -> None:
     if not key:
         print('[INFO] No OPENAI_API_KEY; original RSS metadata shown (no invented translation).')
         return
-    model = os.environ.get('OPENAI_MODEL','gpt-6-luna')
-    base_url = os.environ.get('OPENAI_BASE_URL', 'https://api.openai.com/v1').rstrip('/')
+    model = os.environ.get('OPENAI_MODEL','nvidia/nemotron-3.5-super-vl:free')
+    base_url = os.environ.get('OPENAI_BASE_URL', 'https://openrouter.ai/api/v1').rstrip('/')
     is_openrouter = urlsplit(base_url).hostname == 'openrouter.ai'
     batch_size = 5
     for offset in range(0,len(rows),batch_size):
