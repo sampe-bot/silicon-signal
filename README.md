@@ -1,6 +1,6 @@
 # SILICON SIGNAL — Semiconductor & AI Weekly
 
-半導体、半導体製造装置、半導体材料、AIの週次ニュースサイト。**完全な記事本文は複製せず**、RSSの見出し・短い概要と元記事リンクを掲載する。
+半導体、半導体製造装置、半導体材料、AIの週次ニュースサイト。**完全な記事本文は複製せず**、RSSの見出し・短い概要と元記事リンクを掲載する。https://sampe-bot.github.io/silicon-signal/
 
 ![Status](https://img.shields.io/badge/deployment-GitHub%20Pages-90e5bb)
 
@@ -38,15 +38,6 @@ uv run scripts/collect.py --week current
 - AIに渡すのはRSSの**見出しと短い概要**
 - AI要約は自動生成のため、誤りが発生しうる。
 - 重要数値や発表内容は必ずソースを確認すること
-
-## GitHub Pages に公開する手順
-1. GitHubで新しいリポジトリを作り、このフォルダの内容を `main` ブランチにpushします。
-2. Repository → **Settings → Pages → Build and deployment → Source** を **GitHub Actions** にします。
-3. **Actions → Publish SILICON SIGNAL Weekly** を開き、初回の実行結果を確認します。`main`へのpushでもサイトを公開します。
-4. 任意：Repository → **Settings → Secrets and variables → Actions** に `OPENAI_API_KEY` を登録すると週次翻訳・要約を有効化できます。登録しなくても収集・公開は動作します。
-5. 毎週**月曜 07:17 JST**（UTC日曜22:17）の設定で前週分を集め、新しい版を公開・履歴保存します。スケジュール実行には遅延が生じる場合があります。
-
-> GitHub PagesでサイトURLは `https://<USERNAME>.github.io/<REPOSITORY>/` の形式です。リンクは相対パスを使っているためプロジェクトサイトにも対応します。公開設定やActions権限はアカウント・リポジトリの設定に従います。
 
 ## カスタマイズ
 
