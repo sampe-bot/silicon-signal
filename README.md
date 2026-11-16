@@ -71,3 +71,4 @@ Static HTML/CSS/JavaScript + Python標準ライブラリRSS収集 + GitHub Actio
 ## 開発メモ
 - Gemini APIの利用可に拡張
 - 調査範囲に特許と論文データベースを追加する
+- 更新日時を西暦表示とする
