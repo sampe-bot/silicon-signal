@@ -13,7 +13,16 @@
   const state = {edition:null,index:null,cat:'all',sort:'important',query:'',savedOnly:false};
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const fmtDate = s => {const d=new Date(s);return Number.isNaN(+d)?String(s).slice(0,10):new Intl.DateTimeFormat('ja-JP',{month:'2-digit',day:'2-digit',timeZone:'Asia/Tokyo'}).format(d)};
-  const fmtUpdated = s => {const d=new Date(s);return Number.isNaN(+d)?'':new Intl.DateTimeFormat('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'Asia/Tokyo'}).format(d)+' JST'};
+  const fmtUpdated = s => {
+    const d=new Date(s);
+    return Number.isNaN(+d)?'': new Intl.DateTimeFormat('ja-JP',{
+      year:'numeric',
+      month:'numeric',
+      day:'numeric',
+      hour:'2-digit',
+      minute:'2-digit',
+      timeZone:'Asia/Tokyo'}).format(d)+' JST';
+  };
   const safeUrl = url => { try{const u=new URL(url);return ['https:','http:'].includes(u.protocol)?u.href:'#';}catch(_){return '#';}};
   const names = Object.fromEntries(CATS.map(c=>[c.id,c.name]));
   const cls = cat => CATS.some(c=>c.id===cat)?cat:'semiconductor';
