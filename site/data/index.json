@@ -1,6 +1,14 @@
 {
-  "latest": "2026-W46",
+  "latest": "2026-W47",
   "editions": [
+    {
+      "week": "2026-W47",
+      "start": "2026-11-16",
+      "end": "2026-11-22",
+      "generatedAt": "2026-11-23T11:53:52+09:00",
+      "provisional": false,
+      "count": 44
+    },
     {
       "week": "2026-W46",
       "start": "2026-11-09",
