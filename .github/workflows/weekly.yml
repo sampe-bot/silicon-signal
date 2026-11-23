@@ -16,7 +16,7 @@ on:
         default: 'previous'
   schedule:
     # Every Monday 07:17 JST (Sunday 22:17 UTC), outside the top-of-hour congestion.
-    - cron: '17 22 * * 0'
+    - cron: '12 22 * * 0'
 
 permissions:
   contents: write
