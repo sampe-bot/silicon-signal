@@ -132,6 +132,27 @@ def choose_week(mode: str) -> str:
 
 
 def collect(feeds: list[dict], start: dt.datetime, end: dt.datetime) -> tuple[list[dict],int]:
+    """Collect up to 30 valid RSS/Atom article records per feed in a time window.
+
+    Args:
+        feeds: Feed configurations with required ``name`` and ``url`` keys and
+            optional ``category`` and ``priority`` keys.
+        start: Inclusive, timezone-aware publication time boundary.
+        end: Exclusive, timezone-aware publication time boundary.
+
+    Returns:
+        A tuple of unenriched article records and the number of feeds fetched
+        and parsed with at least one entry. A feed counts as successful even
+        when none of its entries falls within the window. Records have cleaned
+        text, normalized URLs, URL-derived IDs, categories, and importance scores.
+
+    Entries with missing or invalid dates, titles, or URLs are skipped. Feed
+    errors are logged to stderr, and collection continues with the next feed.
+    The caller handles deduplication, merging, translation, and persistence.
+
+    Raises:
+        RuntimeError: No feed could be fetched and parsed with any entries.
+    """
     rows, successes = [], 0
     for feed in feeds:
         try:
@@ -171,10 +192,10 @@ def collect(feeds: list[dict], start: dt.datetime, end: dt.datetime) -> tuple[li
     return rows, successes
 
 
-def dedupe(rows: list[dict]) -> list[dict]:
+def dedupe(rows: list[dict], existing: list[dict] | None = None) -> list[dict]:
     dedup = {}
-    # Prefer official/higher-priority source then recent.
-    for item in sorted(rows, key=lambda x:(x['score'], x['publishedAt']), reverse=True):
+    # Keep published titles first, then prefer higher-priority and recent sources.
+    for item in [*(existing or []), *sorted(rows, key=lambda x:(x['score'], x['publishedAt']), reverse=True)]:
         title_key=re.sub(r'[^\w]+','',unicodedata.normalize('NFKC',item['title']).lower())[:100]
         key = title_key if len(title_key) > 16 else item['url']
         if key not in dedup:
@@ -182,9 +203,14 @@ def dedupe(rows: list[dict]) -> list[dict]:
     return list(dedup.values())
 
 
-def balanced_select(rows: list[dict], limit: int = 44) -> list[dict]:
+def balanced_select(rows: list[dict], limit: int = 44, existing: list[dict] | None = None) -> list[dict]:
     rows = sorted(rows,key=lambda a:(a['score'],a['publishedAt']),reverse=True)
-    chosen, used, counts = [], set(), {}
+    # Published articles keep their slots, even if the limit has since decreased.
+    chosen = list(existing or [])
+    used = {item['id'] for item in chosen}
+    counts = {}
+    for item in chosen:
+        counts[item['source']] = counts.get(item['source'], 0) + 1
     def try_add(item):
         if item['id'] in used or counts.get(item['source'],0)>=7 or len(chosen)>=limit:
             return
@@ -193,6 +219,36 @@ def balanced_select(rows: list[dict], limit: int = 44) -> list[dict]:
         for row in [x for x in rows if x['category']==cat][:5]:try_add(row)
     for row in rows:try_add(row)
     return sorted(chosen,key=lambda a:(a['score'],a['publishedAt']),reverse=True)
+
+
+def merge_articles(existing: list[dict], collected: list[dict], limit: int = 44) -> list[dict]:
+    """Refresh by ID without treating missing RSS entries as deletions."""
+    merged = {row['id']: row.copy() for row in existing}
+    fresh = {}
+    for row in sorted(collected, key=lambda a:(a['score'],a['publishedAt']), reverse=True):
+        fresh.setdefault(row['id'], row)
+    for uid, old in merged.items():
+        # 新しい記事はfreshに残り、後の処理で追加候補となる
+        row = fresh.pop(uid, None)
+        # 今回取得できなかった記事は更新をスキップし、既存データを残す
+        if row is None:
+            continue
+        # 今回も取得できた記事は今回の値を優先して更新する
+        updated = {**old, **row}
+        # These fields are the inputs to Japanese enrichment.
+        if all(
+            old.get(field, '') == row.get(field, '') 
+            for field in ('title', 'summary', 'category')
+        ):
+            for field in ('titleJa', 'summaryJa', 'whyJa', 'enriched'):
+                if field in old:
+                    updated[field] = old[field]
+        # この後で翻訳の再利用を判定する
+        merged[uid] = updated
+    # Keep title-based deduplication for new entries without evicting published IDs.
+    candidates = dedupe(list(fresh.values()), existing=list(merged.values()))
+    candidates = [row for row in candidates if row['id'] not in merged]
+    return balanced_select(candidates, limit, existing=list(merged.values()))
 
 
 def enrichment_records(response: dict) -> list[dict]:
@@ -222,6 +278,9 @@ def enrichment_records(response: dict) -> list[dict]:
 
 
 def enrich_with_openai(rows: list[dict]) -> None:
+    rows = [row for row in rows if not row.get('enriched')]
+    if not rows:
+        return
     key = os.environ.get('OPENAI_API_KEY','')
     if not key:
         print('[INFO] No OPENAI_API_KEY; original RSS metadata shown (no invented translation).')
@@ -284,22 +343,39 @@ def write_json(path: Path, value: object) -> None:
 def main() -> None:
     p=argparse.ArgumentParser()
     p.add_argument('--week',default='previous',help='previous, current, or YYYY-Www')
-    p.add_argument('--limit',type=int,default=44)
+    p.add_argument('--limit',type=int,default=44,help='target article count; existing articles are always retained')
     args=p.parse_args()
     week = choose_week(args.week) if args.week in ('previous','current') else args.week
     start,end = iso_week_bounds(week)
     feeds=json.loads((ROOT/'config/feeds.json').read_text(encoding='utf-8'))
-    rows,successes=collect(feeds,start,end)
-    rows=balanced_select(dedupe(rows),args.limit)
+    edition_path = DATA / 'editions' / f'{week}.json'
+    existing = (
+        json.loads(edition_path.read_text(encoding='utf-8'))['articles'] 
+        if edition_path.exists() 
+        else []
+    )
+    rows, successes = collect(feeds, start, end)
+    # 同じ週の情報収集では新しい記事に更新するので統合する
+    rows = merge_articles(existing, rows, args.limit)
     if not rows:raise RuntimeError(f'No articles found for {week} across {successes} responsive RSS sources. Refusing to publish empty issue.')
     enrich_with_openai(rows)
+    # 「前回は翻訳済みだったが今回は翻訳済みにならなかった」記事は、前回の原文と日本語訳をセットで保持する
+    previous = {row['id']: row for row in existing}
+    for index, row in enumerate(rows):
+        old = previous.get(row['id'])
+        if old and old.get('enriched') and not row.get('enriched'):
+            # A changed original needs a new translation. On failure, retain the
+            # previous original and translation together so they cannot disagree.
+            rows[index] = old
+            print(f'[WARN] Keeping previous translated article: {row["id"]}', file=sys.stderr)
+    rows.sort(key=lambda a:(a['score'],a['publishedAt']),reverse=True)
     now=dt.datetime.now(JST)
     provisional=now<end
     edition={'week':week,'start':start.date().isoformat(),'end':(end-dt.timedelta(days=1)).date().isoformat(),
         'generatedAt':now.isoformat(timespec='seconds'),'provisional':provisional,
         'overview':f'今週は{len(rows)}件を収録。掲載記事はRSSの見出し・短い概要をもとにまとめています。重要な数値や内容は必ず原典で確認してください。',
         'articles':rows}
-    write_json(DATA/'editions'/f'{week}.json',edition)
+    write_json(edition_path,edition)
     editions=[]
     for path in sorted((DATA/'editions').glob('????-W??.json'),reverse=True):
         obj=json.loads(path.read_text(encoding='utf-8'))
