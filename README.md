@@ -13,7 +13,7 @@
 - ブックマーク保存（閲覧ブラウザの localStorage 内だけ）
 - 週ごとのアーカイブ（`site/data/editions/`）
 - GitHub Actionsによる毎週月曜07:17 JST更新
-- 14系統のRSSフィード + 任意のOpenAI APIによる日本語翻訳・要約
+- 14系統のRSSフィード + OpenAIまたはOpenRouterによる任意の日本語翻訳・要約
 
 ## ローカル環境での更新手順
 
@@ -30,13 +30,37 @@ uv run python -m http.server 8000 -d site
 - 取得元のRSSフィードによって過去記事の保持件数が限られるため、過去週のバックフィルには適していない
 - デフォルトでは原文RSSメタデータをそのまま表示する
 - 英語記事のタイトルも英語のまま。
+
 ## 日本語ダイジェストを自動生成する手順
+
+利用するサービスのAPIキーとモデルIDを設定し、`LLM_PROVIDER` でサービスを選びます。
+
+| `LLM_PROVIDER` | APIキーの環境変数 | モデルIDの環境変数 |
+| --- | --- | --- |
+| `openai` | `OPENAI_API_KEY` | `OPENAI_MODEL` |
+| `openrouter` | `OPENROUTER_API_KEY` | `OPENROUTER_MODEL` |
+
+OpenAIを使う場合の実行例です。
+
 ```bash
+export LLM_PROVIDER=openai
 export OPENAI_API_KEY='your_api_key_here'
-export OPENAI_MODEL='gpt-6-luna'
+export OPENAI_MODEL='your_openai_model_id'
 uv run scripts/collect.py --week current
 ```
-- AI要約に使うLLMサービス（OpenAIなど）のAPIキーは、サーバー側（GitHub Actions）でのみ使用し、公開サイトには含めない。
+
+OpenRouterを使う場合の実行例です。
+
+```bash
+export LLM_PROVIDER=openrouter
+export OPENROUTER_API_KEY='your_openrouter_api_key_here'
+export OPENROUTER_MODEL='nvidia/nemotron-3.5-super-vl:free'
+uv run scripts/collect.py --week current
+```
+
+各サービスのキーとモデルを設定済みであれば、普段の切り替えはローカルの環境変数 `LLM_PROVIDER` を変更するだけです。GitHub Actionsでは、週次ワークフローからこの変数を渡す設定を適用した後、Actions Variableの `LLM_PROVIDER` で切り替えます。
+
+- APIキーは収集スクリプトの実行環境で使用し、公開サイトには含めない。
 - AIに渡すのはRSSの**見出しと短い概要**
 - 見出し・概要・カテゴリーが変わらない記事は既存の翻訳を再利用し、未翻訳の記事だけ再試行する。
 - 原文などが変わった記事は再翻訳する。翻訳が失敗・欠落した場合やAPIキーがない場合は、前回保存した原文と日本語要約をセットで保持し、次回再収集時に再試行する。
@@ -76,5 +100,5 @@ Static HTML/CSS/JavaScript + Python標準ライブラリRSS収集 + GitHub Actio
 
 回帰テスト（外部通信なし）: `uv run python -m unittest discover -s tests -v`
 
-- Gemini APIの利用可に拡張
+- Gemini APIを追加する際は、[収集スクリプト](scripts/collect.py)にGemini用の送信関数を追加し、`LLM_PROVIDERS` に登録する。
 - 調査範囲に特許と論文データベースを追加する

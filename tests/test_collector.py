@@ -5,7 +5,11 @@ import json
 import pathlib
 import tempfile
 import unittest
+from email.message import Message
 from unittest.mock import patch
+from urllib.error import HTTPError
+from urllib.request import HTTPSHandler
+from urllib.response import addinfourl
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 spec=importlib.util.spec_from_file_location('collector',ROOT/'scripts'/'collect.py')
@@ -18,40 +22,61 @@ class CollectorTests(unittest.TestCase):
         translated = [{'id': 'test', 'titleJa': '半導体ニュース', 'summaryJa': '新しい半導体。', 'whyJa': ''}]
         response = {'output': [{'content': [{'type': 'output_text', 'text': json.dumps(translated)}]}]}
         env = {
-            'OPENAI_API_KEY': 'test-key',
-            'OPENAI_BASE_URL': 'https://openrouter.ai/api/v1/',
-            'OPENAI_MODEL': 'nvidia/nemotron-3.5-super-vl:free',
+            'OPENAI_API_KEY': 'openai-key',
+            'OPENAI_MODEL': 'openai-model',
+            'OPENROUTER_API_KEY': 'openrouter-key',
+            'OPENROUTER_MODEL': 'nvidia/nemotron-3.5-super-vl:free',
         }
-        with patch.dict(collector.os.environ, env, clear=True), patch.object(
-            collector, 'urlopen', return_value=io.BytesIO(json.dumps(response).encode())
-        ) as request, patch('sys.stdout', new_callable=io.StringIO):
-            collector.enrich_with_openai([row])
-        sent = request.call_args.args[0]
-        self.assertEqual(sent.full_url, 'https://openrouter.ai/api/v1/responses')
-        self.assertEqual(sent.get_header('Authorization'), 'Bearer test-key')
-        self.assertEqual(json.loads(sent.data)['model'], env['OPENAI_MODEL'])
-        self.assertEqual(json.loads(sent.data)['reasoning'], {'enabled': False})
-        self.assertEqual(json.loads(sent.data)['max_output_tokens'], 8000)
-        self.assertTrue(row['enriched'])
-        self.assertEqual(row['titleJa'], '半導体ニュース')
-
-    def test_enrichment_batches_and_openai_compatibility(self):
-        for base_url in ('https://api.openai.com/v1', 'https://openrouter.ai/api/v1'):
-            with self.subTest(base_url=base_url):
-                rows = [{'id': str(i), 'title': 'Chip', 'summary': 'News', 'category': 'semiconductor'} for i in range(7)]
-                def respond(request, timeout):
-                    body = json.loads(request.data)
-                    self.assertNotIn('reasoning', body)
-                    items = json.loads(body['input'])
-                    translated = [{'id': item['id'], 'titleJa': '半導体'} for item in items]
-                    return io.BytesIO(json.dumps({'output': [{'content': [{'type': 'output_text', 'text': json.dumps(translated)}]}]}).encode())
-                env = {'OPENAI_API_KEY': 'test-key', 'OPENAI_BASE_URL': base_url, 'OPENAI_MODEL': 'other-model'}
-                with patch.dict(collector.os.environ, env, clear=True), patch.object(
-                    collector, 'urlopen', side_effect=respond
+        for provider, endpoint in (
+            ('openai', 'https://api.openai.com/v1/responses'),
+            ('openrouter', 'https://openrouter.ai/api/v1/responses'),
+        ):
+            with self.subTest(provider=provider):
+                article = row.copy()
+                with patch.dict(collector.os.environ, {**env, 'LLM_PROVIDER': provider}, clear=True), patch.object(
+                    collector.LLM_OPENER, 'open', return_value=io.BytesIO(json.dumps(response).encode())
                 ) as request, patch('sys.stdout', new_callable=io.StringIO):
-                    collector.enrich_with_openai(rows)
-                self.assertEqual([len(json.loads(json.loads(call.args[0].data)['input'])) for call in request.call_args_list], [5, 2])
-                self.assertTrue(all(row['enriched'] for row in rows))
+                    translate_batch = collector.select_llm_provider()
+                    collector.enrich_articles([article], translate_batch)
+                sent = request.call_args.args[0]
+                body = json.loads(sent.data)
+                self.assertEqual(sent.full_url, endpoint)
+                self.assertEqual(sent.get_header('Authorization'), f'Bearer {env[provider.upper() + "_API_KEY"]}')
+                self.assertEqual(body['model'], env[provider.upper() + '_MODEL'])
+                self.assertEqual(body['max_output_tokens'], 8000)
+                if provider == 'openrouter':
+                    self.assertEqual(body['reasoning'], {'enabled': False})
+                else:
+                    self.assertNotIn('reasoning', body)
+                self.assertTrue(article['enriched'])
+                self.assertEqual(article['titleJa'], '半導体ニュース')
+
+    def test_enrichment_batches(self):
+        rows = [{'id': str(i), 'title': 'Chip', 'summary': 'News', 'category': 'semiconductor'} for i in range(7)]
+        batch_sizes = []
+
+        def translate_batch(instruction, payload):
+            batch_sizes.append(len(payload))
+            return [{'id': item['id'], 'titleJa': '半導体'} for item in payload]
+
+        with patch('sys.stdout', new_callable=io.StringIO):
+            collector.enrich_articles(rows, translate_batch)
+        self.assertEqual(batch_sizes, [5, 2])
+        self.assertTrue(all(row['enriched'] for row in rows))
+
+    def test_enrichment_rejects_redirects(self):
+        endpoint = 'https://api.openai.com/v1/responses'
+        headers = Message()
+        headers['Location'] = 'https://redirect.example/collect'
+        response = addinfourl(io.BytesIO(), headers, endpoint, 302)
+        response.msg = 'Found'
+        request = collector.Request(endpoint, data=b'{}', headers={'Authorization': 'Bearer test-key'})
+        with patch.object(HTTPSHandler, 'https_open', return_value=response) as send:
+            with self.assertRaises(HTTPError) as error:
+                collector.LLM_OPENER.open(request)
+            self.assertEqual(error.exception.code, 302)
+            error.exception.close()
+        send.assert_called_once_with(request)
 
     def test_enrichment_diagnoses_missing_or_truncated_answers(self):
         cases = [
@@ -63,10 +88,11 @@ class CollectorTests(unittest.TestCase):
             with self.subTest(message=message):
                 row = {'id': 'one', 'title': 'Chip', 'summary': 'News', 'category': 'semiconductor'}
                 original = row.copy()
-                with patch.dict(collector.os.environ, {'OPENAI_API_KEY': 'test-key'}, clear=True), patch.object(
-                    collector, 'urlopen', return_value=io.BytesIO(json.dumps(response).encode())
+                env = {'LLM_PROVIDER': 'openai', 'OPENAI_API_KEY': 'test-key', 'OPENAI_MODEL': 'test-model'}
+                with patch.dict(collector.os.environ, env, clear=True), patch.object(
+                    collector.LLM_OPENER, 'open', return_value=io.BytesIO(json.dumps(response).encode())
                 ), patch.object(collector.time, 'sleep'), patch('sys.stderr', new_callable=io.StringIO) as errors:
-                    collector.enrich_with_openai([row])
+                    collector.enrich_articles([row], collector.select_llm_provider())
                 self.assertEqual(row, original)
                 self.assertIn(message, errors.getvalue())
 
@@ -106,6 +132,8 @@ class CollectorTests(unittest.TestCase):
         self.assertEqual(len(collector.dedupe([row,row2])),1)
 
 class CollectionRerunTests(unittest.TestCase):
+    llm_env = {'LLM_PROVIDER': 'openai', 'OPENAI_API_KEY': 'test-key', 'OPENAI_MODEL': 'test-model'}
+
     def setUp(self):
         self.root = pathlib.Path(self.enterContext(tempfile.TemporaryDirectory()))
         self.data = self.root / 'data'
@@ -118,7 +146,7 @@ class CollectionRerunTests(unittest.TestCase):
         collector.write_json(self.root / 'config' / 'feeds.json', self.feeds)
         self.enterContext(patch.object(collector, 'ROOT', self.root))
         self.enterContext(patch.object(collector, 'DATA', self.data))
-        self.enterContext(patch.dict(collector.os.environ, {'OPENAI_API_KEY': 'test-key'}, clear=True))
+        self.enterContext(patch.dict(collector.os.environ, self.llm_env, clear=True))
         self.enterContext(patch('sys.argv', ['collect.py', '--week', '2026-W46']))
         self.enterContext(patch('sys.stdout', new_callable=io.StringIO))
         self.enterContext(patch('sys.stderr', new_callable=io.StringIO))
@@ -158,7 +186,9 @@ class CollectionRerunTests(unittest.TestCase):
         xml = f'''<rss><channel><item><title>{article['title']}</title>
             <link>{article['url']}</link><description>{article['summary']}</description>
             <pubDate>Thu, 12 Nov 2026 03:00:00 GMT</pubDate></item></channel></rss>'''.encode()
-        with patch.object(collector, 'urlopen', side_effect=[io.BytesIO(xml), OSError('RSS unavailable')]) as request:
+        with patch.object(collector, 'urlopen', side_effect=[io.BytesIO(xml), OSError('RSS unavailable')]) as request, patch.object(
+            collector.LLM_OPENER, 'open'
+        ) as translate:
             collector.main()
         saved = json.loads(self.edition_path.read_text())
         self.assertEqual(len(saved['articles']), 44)
@@ -167,7 +197,8 @@ class CollectionRerunTests(unittest.TestCase):
             old = next(item for item in existing if item['id'] == row['id'])
             for field in ('titleJa', 'summaryJa', 'whyJa', 'enriched'):
                 self.assertEqual(row[field], old[field])
-        self.assertEqual(request.call_count, 2)  # No translation request for unchanged originals.
+        self.assertEqual(request.call_count, 2)
+        translate.assert_not_called()
         index = json.loads(self.index_path.read_text())
         self.assertEqual(index['editions'][0]['count'], 44)
         self.assertIn('44件', saved['overview'])
@@ -200,7 +231,7 @@ class CollectionRerunTests(unittest.TestCase):
     def test_empty_collection_retains_existing_edition_without_api_key(self):
         old = self.article(1)
         self.save_existing([old])
-        with patch.dict(collector.os.environ, {}, clear=True), patch.object(collector, 'urlopen') as request:
+        with patch.dict(collector.os.environ, {}, clear=True), patch.object(collector.LLM_OPENER, 'open') as request:
             self.assertEqual(self.run_with_rows([]), [old])
         request.assert_not_called()
 
@@ -226,13 +257,19 @@ class CollectionRerunTests(unittest.TestCase):
             with self.subTest(failure=failure):
                 self.save_existing([old])
                 records = [] if failure == 'missing record' else [{'id': old['id'], 'titleJa': ''}]
-                with patch.object(collector, 'urlopen') as request:
+                with patch.object(collector.LLM_OPENER, 'open') as request:
                     if failure == 'exception':
                         request.side_effect = OSError('Translation unavailable')
                     else:
                         request.return_value = self.api_response(records)
-                    with patch.dict(collector.os.environ, {} if failure == 'no key' else {'OPENAI_API_KEY': 'test-key'}, clear=True):
+                    env = self.llm_env.copy()
+                    if failure == 'no key':
+                        env.pop('OPENAI_API_KEY')
+                        env['OPENROUTER_API_KEY'] = 'other-provider-key'
+                    with patch.dict(collector.os.environ, env, clear=True):
                         rows = self.run_with_rows([changed.copy(), new.copy()])
+                    if failure == 'no key':
+                        request.assert_not_called()
                 self.assertEqual({row['id']: row for row in rows}, {old['id']: old, new['id']: new})
 
     def test_changed_translation_inputs_are_retranslated_and_untranslated_articles_retried(self):
@@ -247,7 +284,7 @@ class CollectionRerunTests(unittest.TestCase):
                     {'id': old['id'], 'titleJa': '更新された見出し', 'summaryJa': '更新された概要', 'whyJa': ''},
                     {'id': retry['id'], 'titleJa': '再試行した見出し', 'summaryJa': '再試行した概要', 'whyJa': ''},
                 ]
-                with patch.object(collector, 'urlopen', return_value=self.api_response(translated)) as request:
+                with patch.object(collector.LLM_OPENER, 'open', return_value=self.api_response(translated)) as request:
                     rows = self.run_with_rows([changed, self.article(2, enriched=False)])
                 payload = json.loads(json.loads(request.call_args.args[0].data)['input'])
                 self.assertEqual({row['id'] for row in payload}, {old['id'], retry['id']})
@@ -277,7 +314,7 @@ class CollectionRerunTests(unittest.TestCase):
             {'id': row['id'], 'titleJa': '翻訳済みの見出し', 'summaryJa': '翻訳済みの概要'}
             for row in fresh[-2:]
         ]
-        with patch.object(collector, 'urlopen', side_effect=[
+        with patch.object(collector.LLM_OPENER, 'open', side_effect=[
             OSError('First batch failed'), self.api_response(translated)
         ]) as request:
             saved = self.run_with_rows([changed, *fresh])
