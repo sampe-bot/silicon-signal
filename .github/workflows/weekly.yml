@@ -35,16 +35,15 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Configure Python
         if: github.event_name != 'push'
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.12'
       - name: Collect weekly news
         if: github.event_name != 'push'
         env:
-          env:
           LLM_PROVIDER: ${{ vars.LLM_PROVIDER }}
           OPENAI_API_KEY: ${{ vars.LLM_PROVIDER == 'openai' && secrets.SILICON_SIGNAL_OPENAI_API_KEY || '' }}
           OPENAI_MODEL: ${{ vars.LLM_PROVIDER == 'openai' && vars.OPENAI_MODEL || '' }}
@@ -63,11 +62,11 @@ jobs:
             git push
           fi
       - name: Configure GitHub Pages
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v6
       - name: Upload site artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: ./site
       - name: Deploy GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
